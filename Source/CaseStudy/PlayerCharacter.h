@@ -25,6 +25,9 @@ protected:
 	// Called when the game starts or when spawned
 	virtual void BeginPlay() override;
 
+	UFUNCTION(Server, Reliable)
+	void Server_PickupItem(class AItemBase* ItemToPickup);
+
 private:
 
 	UPROPERTY(EditAnywhere, Category = Input, meta = (AllowPrivateAccess = "true"))
@@ -41,6 +44,11 @@ private:
 	UInputAction* PickupAction;
 	UPROPERTY(EditAnywhere, Category = Input, meta = (AllowPrivateAccess = "true"))
 	UInputAction* SwapSlotAction;
+
+	UPROPERTY(EditAnywhere, Category = "Camera")
+	class USpringArmComponent* SpringArm;
+	UPROPERTY(EditAnywhere, Category = "Camera")
+	class UCameraComponent* Camera;
 
 	void Move(const FInputActionValue& Value);
 	void Look(const FInputActionValue& Value);

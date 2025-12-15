@@ -5,13 +5,21 @@
 #include "EnhancedInputComponent.h"
 #include "EnhancedInputSubsystems.h"
 #include "InputMappingContext.h"
+#include "ItemBase.h"
+#include "DrawDebugHelpers.h"
+#include "GameFramework/SpringArmComponent.h"
+#include "Camera/CameraComponent.h"
 
 // Sets default values
 APlayerCharacter::APlayerCharacter()
 {
  	// Set this character to call Tick() every frame.  You can turn this off to improve performance if you don't need it.
 	PrimaryActorTick.bCanEverTick = true;
-
+	SpringArm = CreateDefaultSubobject<USpringArmComponent>(TEXT("SpringArm"));
+	SpringArm->SetupAttachment(GetMesh(), FName("head"));
+	Camera = CreateDefaultSubobject<UCameraComponent>(TEXT("Camera"));
+	Camera->SetupAttachment(SpringArm);
+	SpringArm->bUsePawnControlRotation = true;
 }
 
 // Called when the game starts or when spawned
@@ -86,7 +94,26 @@ void APlayerCharacter::EmptyHand()
 
 void APlayerCharacter::Pickup()
 {
+	FHitResult PickupHitResult;
+	FCollisionQueryParams Params;
+	Params.AddIgnoredActor(this);
+	GetWorld()->LineTraceSingleByChannel(PickupHitResult, GetActorLocation(), GetActorForwardVector() * 200.f + GetActorLocation(), ECC_Visibility, Params);
+	DrawDebugLine(GetWorld(), GetActorLocation(), GetActorForwardVector() * 200.f + GetActorLocation(), FColor::Red, false, 2.f, 1.f, 1.f);
+	if (PickupHitResult.bBlockingHit)
+	{
+		if (AItemBase* ItemToPickup = Cast<AItemBase>(PickupHitResult.GetActor()))
+		{
+			Server_PickupItem(ItemToPickup);
+		}
+	}
+}
 
+void APlayerCharacter::Server_PickupItem_Implementation(AItemBase* ItemToPickup)
+{
+	if (ItemToPickup)
+	{
+		ItemToPickup->Destroy();
+	}
 }
 
 void APlayerCharacter::SwapSlot()
