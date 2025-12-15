@@ -9,6 +9,7 @@
 #include "DrawDebugHelpers.h"
 #include "GameFramework/SpringArmComponent.h"
 #include "Camera/CameraComponent.h"
+#include "PlayerAnimInstance.h"
 
 // Sets default values
 APlayerCharacter::APlayerCharacter()
@@ -84,12 +85,41 @@ void APlayerCharacter::Look(const FInputActionValue& Value)
 
 void APlayerCharacter::Drop()
 {
+	FVector SpawnLoc = Camera->GetComponentLocation() + (Camera->GetForwardVector() * 100.f);
+	FRotator SpawnRot = Camera->GetComponentRotation();
+	Server_DropItem(SpawnLoc, SpawnRot);
+}
+
+void APlayerCharacter::Server_DropItem_Implementation(FVector SpawnLocation, FRotator SpawnRotation)
+{
+	if (ItemBaseClass)
+	{
+		Multicast_PlayDropAnim();
+		FTimerHandle DropHandle;
+		FTimerDelegate DropDelegate;
+		DropDelegate.BindLambda([this, SpawnLocation, SpawnRotation]()
+		{
+			FActorSpawnParameters SpawnParams;
+			SpawnParams.Owner = this;
+			GetWorld()->SpawnActor<AActor>(
+				ItemBaseClass,
+				SpawnLocation,
+				SpawnRotation,
+				SpawnParams
+			);
+		});
+		GetWorld()->GetTimerManager().SetTimer(DropHandle, DropDelegate, 0.8f, false);
+	}
 
 }
 
-void APlayerCharacter::EmptyHand()
+void APlayerCharacter::Multicast_PlayDropAnim_Implementation()
 {
-
+	PlayerAnimInstanceRef = Cast<UPlayerAnimInstance>(GetMesh()->GetAnimInstance());
+	if (ThrowMontage)
+	{
+		PlayerAnimInstanceRef->Montage_Play(ThrowMontage);
+	}
 }
 
 void APlayerCharacter::Pickup()
@@ -97,8 +127,10 @@ void APlayerCharacter::Pickup()
 	FHitResult PickupHitResult;
 	FCollisionQueryParams Params;
 	Params.AddIgnoredActor(this);
-	GetWorld()->LineTraceSingleByChannel(PickupHitResult, GetActorLocation(), GetActorForwardVector() * 200.f + GetActorLocation(), ECC_Visibility, Params);
-	DrawDebugLine(GetWorld(), GetActorLocation(), GetActorForwardVector() * 200.f + GetActorLocation(), FColor::Red, false, 2.f, 1.f, 1.f);
+	FVector TraceStart = Camera->GetComponentLocation();
+	FVector TraceEnd = TraceStart + (Camera->GetForwardVector() * 400.f);
+	GetWorld()->LineTraceSingleByChannel(PickupHitResult, TraceStart, TraceEnd, ECC_Visibility, Params);
+	DrawDebugLine(GetWorld(), TraceStart, TraceEnd, FColor::Red, false, 2.f, 1.f, 1.f);
 	if (PickupHitResult.bBlockingHit)
 	{
 		if (AItemBase* ItemToPickup = Cast<AItemBase>(PickupHitResult.GetActor()))
@@ -112,11 +144,26 @@ void APlayerCharacter::Server_PickupItem_Implementation(AItemBase* ItemToPickup)
 {
 	if (ItemToPickup)
 	{
+		Multicast_PlayPickupAnim();
 		ItemToPickup->Destroy();
 	}
 }
 
+void APlayerCharacter::Multicast_PlayPickupAnim_Implementation()
+{
+	PlayerAnimInstanceRef = Cast<UPlayerAnimInstance>(GetMesh()->GetAnimInstance());
+	if (PickupMontage)
+	{
+		PlayerAnimInstanceRef->Montage_Play(PickupMontage);
+	}
+}
+
 void APlayerCharacter::SwapSlot()
+{
+
+}
+
+void APlayerCharacter::EmptyHand()
 {
 
 }

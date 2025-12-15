@@ -27,8 +27,18 @@ protected:
 
 	UFUNCTION(Server, Reliable)
 	void Server_PickupItem(class AItemBase* ItemToPickup);
+	UFUNCTION(NetMulticast, Unreliable)
+	void Multicast_PlayPickupAnim();
+	UFUNCTION(Server, Reliable)
+	void Server_DropItem(FVector SpawnLocation, FRotator SpawnRotation);
+	UFUNCTION(NetMulticast, Unreliable)
+	void Multicast_PlayDropAnim();
 
 private:
+
+	UPROPERTY()
+	class UPlayerAnimInstance* PlayerAnimInstanceRef;
+
 
 	UPROPERTY(EditAnywhere, Category = Input, meta = (AllowPrivateAccess = "true"))
 	class UInputMappingContext* PlayerMappingContext;
@@ -45,10 +55,23 @@ private:
 	UPROPERTY(EditAnywhere, Category = Input, meta = (AllowPrivateAccess = "true"))
 	UInputAction* SwapSlotAction;
 
-	UPROPERTY(EditAnywhere, Category = "Camera")
+
+	UPROPERTY(VisibleAnywhere, Category = "Camera")
 	class USpringArmComponent* SpringArm;
-	UPROPERTY(EditAnywhere, Category = "Camera")
+	UPROPERTY(VisibleAnywhere, Category = "Camera")
 	class UCameraComponent* Camera;
+
+	
+	UPROPERTY(EditAnywhere, Category = "Animations", meta = (AllowPrivateAccess = "true"))
+	class UAnimMontage* PickupMontage;
+
+	UPROPERTY(EditAnywhere, Category = "Animations", meta = (AllowPrivateAccess = "true"))
+	UAnimMontage* ThrowMontage;
+
+
+	UPROPERTY(EditAnywhere, Category = "ThrowObject", meta = (AllowPrivateAccess = "true"))
+	TSubclassOf<class AItemBase> ItemBaseClass;
+
 
 	void Move(const FInputActionValue& Value);
 	void Look(const FInputActionValue& Value);
