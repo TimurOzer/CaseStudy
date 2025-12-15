@@ -46,6 +46,8 @@ void APlayerCharacter::BeginPlay()
 		HUDWidget = CreateWidget<UUW_CaseStudy>(GetWorld(), HUDWidgetClass);
 		if (HUDWidget)
 		{
+			HUDWidget->SetActiveSlotHighlight(ActiveSlotIndex);
+			UpdateHandVisuals();
 			HUDWidget->AddToViewport();
 		}
 	}
@@ -258,10 +260,18 @@ void APlayerCharacter::Server_SwitchSlot_Implementation(int32 NewSlotIndex)
 void APlayerCharacter::OnRep_ActiveSlotIndex()
 {
 	UpdateHandVisuals();
+	if (HUDWidget)
+	{
+		HUDWidget->SetActiveSlotHighlight(ActiveSlotIndex);
+	}
 }
 
 void APlayerCharacter::UpdateHandVisuals()
 {
+	if (HUDWidget)
+	{
+		HUDWidget->SetActiveSlotHighlight(ActiveSlotIndex);
+	}
 	for (int32 i = 0; i < Inventory.Num(); i++)
 	{
 		AItemBase* Item = Inventory[i];
