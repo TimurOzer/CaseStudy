@@ -10,6 +10,7 @@
 #include "GameFramework/SpringArmComponent.h"
 #include "Camera/CameraComponent.h"
 #include "PlayerAnimInstance.h"
+#include "UW_CaseStudy.h"
 #include "Net/UnrealNetwork.h"
 
 // Sets default values
@@ -39,6 +40,14 @@ void APlayerCharacter::BeginPlay()
 	{
 		Inventory.Init(nullptr, 2);
 		ActiveSlotIndex = 0;
+	}
+	if (IsLocallyControlled() && HUDWidgetClass)
+	{
+		HUDWidget = CreateWidget<UUW_CaseStudy>(GetWorld(), HUDWidgetClass);
+		if (HUDWidget)
+		{
+			HUDWidget->AddToViewport();
+		}
 	}
 }
 
@@ -256,6 +265,32 @@ void APlayerCharacter::UpdateHandVisuals()
 	for (int32 i = 0; i < Inventory.Num(); i++)
 	{
 		AItemBase* Item = Inventory[i];
+		if (HUDWidget)
+		{
+			if (Item)
+			{
+				if (Item->GetItemIcon())
+				{
+					HUDWidget->UpdateSlotImage(i, Item->GetItemIcon());
+				}
+				else
+				{
+					UE_LOG(LogTemp, Error, TEXT("HATA Slot %d: %s iteminin IKONU (Texture) yok! BP'yi kontrol et."), i, *Item->GetName());
+					HUDWidget->UpdateSlotImage(i, nullptr);
+				}
+			}
+			else
+			{
+				HUDWidget->UpdateSlotImage(i, nullptr);
+			}
+		}
+		else
+		{
+			if (IsLocallyControlled())
+			{
+				UE_LOG(LogTemp, Error, TEXT("KRITIK HATA: HUDWidget NULL! BeginPlay icinde Widget olusmamis veya Class secilmemis."));
+			}
+		}
 		if (Item)
 		{
 			UStaticMeshComponent* ItemMesh = Cast<UStaticMeshComponent>(Item->GetRootComponent());

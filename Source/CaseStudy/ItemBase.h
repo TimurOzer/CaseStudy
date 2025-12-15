@@ -16,7 +16,10 @@ public:
 	AItemBase();
 	// Called every frame
 	virtual void Tick(float DeltaTime) override;
+	UPROPERTY(EditAnywhere, Category = "UI")
+	class UTexture2D* ItemIcon;
 
+	UTexture2D* GetItemIcon() const { return ItemIcon; }
 protected:
 	// Called when the game starts or when spawned
 	virtual void BeginPlay() override;

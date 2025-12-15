@@ -104,6 +104,10 @@ private:
 	UPROPERTY(EditAnywhere, Category = "ThrowObject", meta = (AllowPrivateAccess = "true"))
 	TSubclassOf<class AItemBase> ItemBaseClass;
 
+	UPROPERTY(EditDefaultsOnly, Category = "UI")
+	TSubclassOf<class UUW_CaseStudy> HUDWidgetClass;
+	UPROPERTY()
+	class UUW_CaseStudy* HUDWidget;
 
 	void Move(const FInputActionValue& Value);
 	void Look(const FInputActionValue& Value);
