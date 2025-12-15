@@ -12,6 +12,8 @@ AItemBase::AItemBase()
 	ItemMesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("ItemMesh"));
 	ItemMesh->SetupAttachment(RootComponent);
 	bReplicates = true;
+	SetReplicateMovement(true);
+	ItemMesh->SetSimulatePhysics(true);
 }
 
 // Called when the game starts or when spawned

@@ -10,6 +10,7 @@
 #include "GameFramework/SpringArmComponent.h"
 #include "Camera/CameraComponent.h"
 #include "PlayerAnimInstance.h"
+#include "Net/UnrealNetwork.h"
 
 // Sets default values
 APlayerCharacter::APlayerCharacter()
@@ -34,6 +35,30 @@ void APlayerCharacter::BeginPlay()
 			Subsystem->AddMappingContext(PlayerMappingContext, 0);
 		}
 	}
+	if (HasAuthority())
+	{
+		Inventory.Init(nullptr, 2);
+		ActiveSlotIndex = 0;
+	}
+}
+
+void APlayerCharacter::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
+{
+	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
+
+	DOREPLIFETIME(APlayerCharacter, Inventory);
+	DOREPLIFETIME(APlayerCharacter, ActiveSlotIndex);
+	DOREPLIFETIME(APlayerCharacter, bIsHandEmpty);
+}
+
+void APlayerCharacter::OnRep_Inventory()
+{
+	UpdateHandVisuals();
+}
+
+void APlayerCharacter::OnRep_IsHandEmpty()
+{
+	UpdateHandVisuals();
 }
 
 // Called every frame
@@ -54,7 +79,8 @@ void APlayerCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputCom
 		EnhancedInputComponent->BindAction(DropAction, ETriggerEvent::Started, this, &APlayerCharacter::Drop);
 		EnhancedInputComponent->BindAction(EmptyHandAction, ETriggerEvent::Started, this, &APlayerCharacter::EmptyHand);
 		EnhancedInputComponent->BindAction(PickupAction, ETriggerEvent::Started, this, &APlayerCharacter::Pickup);
-		EnhancedInputComponent->BindAction(SwapSlotAction, ETriggerEvent::Started, this, &APlayerCharacter::SwapSlot);
+		EnhancedInputComponent->BindAction(Slot1Action, ETriggerEvent::Started, this, &APlayerCharacter::EquipSlot1);
+		EnhancedInputComponent->BindAction(Slot2Action, ETriggerEvent::Started, this, &APlayerCharacter::EquipSlot2);
 	}
 }
 
@@ -92,25 +118,38 @@ void APlayerCharacter::Drop()
 
 void APlayerCharacter::Server_DropItem_Implementation(FVector SpawnLocation, FRotator SpawnRotation)
 {
-	if (ItemBaseClass)
+	if (Inventory.IsValidIndex(ActiveSlotIndex) && Inventory[ActiveSlotIndex] != nullptr && !bIsHandEmpty)
 	{
+		AItemBase* ItemToDrop = Inventory[ActiveSlotIndex];
+
 		Multicast_PlayDropAnim();
+
 		FTimerHandle DropHandle;
 		FTimerDelegate DropDelegate;
-		DropDelegate.BindLambda([this, SpawnLocation, SpawnRotation]()
+
+		DropDelegate.BindLambda([this, ItemToDrop, SpawnLocation, SpawnRotation]()
 		{
-			FActorSpawnParameters SpawnParams;
-			SpawnParams.Owner = this;
-			GetWorld()->SpawnActor<AActor>(
-				ItemBaseClass,
-				SpawnLocation,
-				SpawnRotation,
-				SpawnParams
-			);
+			if (!ItemToDrop) return;
+
+			Multicast_FinishDropItem(ItemToDrop, SpawnLocation, SpawnRotation);
+
+			UStaticMeshComponent* ItemMesh = Cast<UStaticMeshComponent>(ItemToDrop->GetRootComponent());
+			if (ItemMesh)
+			{
+				ItemMesh->SetSimulatePhysics(true);
+				ItemMesh->AddImpulse(SpawnRotation.Vector() * 500.f, NAME_None, true);
+			}
+			ItemToDrop->ForceNetUpdate();
+
+			if (Inventory.IsValidIndex(ActiveSlotIndex))
+			{
+				Inventory[ActiveSlotIndex] = nullptr;
+				OnRep_Inventory();
+			}
 		});
+
 		GetWorld()->GetTimerManager().SetTimer(DropHandle, DropDelegate, 0.8f, false);
 	}
-
 }
 
 void APlayerCharacter::Multicast_PlayDropAnim_Implementation()
@@ -142,10 +181,36 @@ void APlayerCharacter::Pickup()
 
 void APlayerCharacter::Server_PickupItem_Implementation(AItemBase* ItemToPickup)
 {
-	if (ItemToPickup)
+	if (!ItemToPickup) return;
+
+	if (ItemToPickup->GetOwner() != nullptr)
 	{
+		return;
+	}
+
+	int32 TargetSlot = -1;
+	if (Inventory[ActiveSlotIndex] == nullptr)
+	{
+		TargetSlot = ActiveSlotIndex;
+	}
+	else
+	{
+		int32 OtherSlot = (ActiveSlotIndex + 1) % 2;
+		if (Inventory[OtherSlot] == nullptr) TargetSlot = OtherSlot;
+	}
+
+	if (TargetSlot != -1)
+	{
+		Inventory[TargetSlot] = ItemToPickup;
+		ItemToPickup->SetOwner(this);
+
+		if (TargetSlot == ActiveSlotIndex)
+		{
+			bIsHandEmpty = false;
+		}
+
+		OnRep_Inventory();
 		Multicast_PlayPickupAnim();
-		ItemToPickup->Destroy();
 	}
 }
 
@@ -158,12 +223,88 @@ void APlayerCharacter::Multicast_PlayPickupAnim_Implementation()
 	}
 }
 
-void APlayerCharacter::SwapSlot()
+void APlayerCharacter::EquipSlot1()
 {
+	Server_SwitchSlot(0);
+}
 
+void APlayerCharacter::EquipSlot2()
+{
+	Server_SwitchSlot(1);
+}
+
+void APlayerCharacter::Server_SwitchSlot_Implementation(int32 NewSlotIndex)
+{
+	if (NewSlotIndex < 0 || NewSlotIndex > 1) return;
+
+	if (ActiveSlotIndex == NewSlotIndex && !bIsHandEmpty) return;
+
+	ActiveSlotIndex = NewSlotIndex;
+
+	bIsHandEmpty = false;
+
+	OnRep_ActiveSlotIndex();
+}
+
+void APlayerCharacter::OnRep_ActiveSlotIndex()
+{
+	UpdateHandVisuals();
+}
+
+void APlayerCharacter::UpdateHandVisuals()
+{
+	for (int32 i = 0; i < Inventory.Num(); i++)
+	{
+		AItemBase* Item = Inventory[i];
+		if (Item)
+		{
+			UStaticMeshComponent* ItemMesh = Cast<UStaticMeshComponent>(Item->GetRootComponent());
+			if (ItemMesh)
+			{
+				ItemMesh->SetSimulatePhysics(false);
+				ItemMesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+			}
+
+			if (i == ActiveSlotIndex && !bIsHandEmpty)
+			{
+				Item->SetActorHiddenInGame(false);
+				Item->AttachToComponent(GetMesh(), FAttachmentTransformRules::SnapToTargetNotIncludingScale, FName("HandSocket"));
+			}
+			else
+			{
+				Item->SetActorHiddenInGame(true);
+			}
+		}
+	}
+}
+
+void APlayerCharacter::Multicast_FinishDropItem_Implementation(AItemBase* ItemToDrop, FVector Location, FRotator Rotation)
+{
+	if (!ItemToDrop) return;
+
+	ItemToDrop->DetachFromActor(FDetachmentTransformRules::KeepWorldTransform);
+	ItemToDrop->SetActorLocationAndRotation(Location, Rotation);
+
+	ItemToDrop->SetOwner(nullptr);
+	ItemToDrop->SetActorHiddenInGame(false);
+	ItemToDrop->SetActorEnableCollision(true);
+
+	UStaticMeshComponent* ItemMesh = Cast<UStaticMeshComponent>(ItemToDrop->GetRootComponent());
+	if (ItemMesh)
+	{
+		ItemMesh->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
+		ItemMesh->SetSimulatePhysics(false);
+	}
 }
 
 void APlayerCharacter::EmptyHand()
 {
+	Server_ToggleEmptyHand();
+}
 
+void APlayerCharacter::Server_ToggleEmptyHand_Implementation()
+{
+	bIsHandEmpty = !bIsHandEmpty;
+
+	OnRep_IsHandEmpty();
 }

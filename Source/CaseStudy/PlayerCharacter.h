@@ -34,6 +34,36 @@ protected:
 	UFUNCTION(NetMulticast, Unreliable)
 	void Multicast_PlayDropAnim();
 
+	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
+
+	UPROPERTY(ReplicatedUsing = OnRep_Inventory)
+	TArray<class AItemBase*> Inventory;
+
+	UPROPERTY(ReplicatedUsing = OnRep_ActiveSlotIndex)
+	int32 ActiveSlotIndex;
+
+	UFUNCTION()
+	void OnRep_ActiveSlotIndex();
+
+	void UpdateHandVisuals();
+
+	UFUNCTION(Server, Reliable)
+	void Server_SwitchSlot(int32 NewSlotIndex);
+
+	UFUNCTION()
+	void OnRep_Inventory();
+
+	UFUNCTION(NetMulticast, Reliable)
+	void Multicast_FinishDropItem(AItemBase* ItemToDrop, FVector Location, FRotator Rotation);
+
+	UPROPERTY(ReplicatedUsing = OnRep_IsHandEmpty)
+	bool bIsHandEmpty;
+
+	UFUNCTION()
+	void OnRep_IsHandEmpty();
+
+	UFUNCTION(Server, Reliable)
+	void Server_ToggleEmptyHand();
 private:
 
 	UPROPERTY()
@@ -53,7 +83,9 @@ private:
 	UPROPERTY(EditAnywhere, Category = Input, meta = (AllowPrivateAccess = "true"))
 	UInputAction* PickupAction;
 	UPROPERTY(EditAnywhere, Category = Input, meta = (AllowPrivateAccess = "true"))
-	UInputAction* SwapSlotAction;
+	UInputAction* Slot1Action;
+	UPROPERTY(EditAnywhere, Category = Input, meta = (AllowPrivateAccess = "true"))
+	UInputAction* Slot2Action;
 
 
 	UPROPERTY(VisibleAnywhere, Category = "Camera")
@@ -78,5 +110,6 @@ private:
 	void Drop();
 	void EmptyHand();
 	void Pickup();
-	void SwapSlot();
+	void EquipSlot1();
+	void EquipSlot2();
 };
