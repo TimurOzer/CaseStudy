@@ -40,6 +40,7 @@ void APlayerCharacter::BeginPlay()
 	{
 		Inventory.Init(nullptr, 2);
 		ActiveSlotIndex = 0;
+		bIsHandEmpty = true;
 	}
 	if (IsLocallyControlled() && HUDWidgetClass)
 	{
@@ -72,11 +73,13 @@ void APlayerCharacter::OnRep_IsHandEmpty()
 	UpdateHandVisuals();
 }
 
-// Called every frame
-void APlayerCharacter::Tick(float DeltaTime)
+void APlayerCharacter::OnRep_ActiveSlotIndex()
 {
-	Super::Tick(DeltaTime);
-
+	UpdateHandVisuals();
+	if (HUDWidget)
+	{
+		HUDWidget->SetActiveSlotHighlight(ActiveSlotIndex);
+	}
 }
 
 // Called to bind functionality to input
@@ -117,58 +120,6 @@ void APlayerCharacter::Look(const FInputActionValue& Value)
 	{
 		AddControllerYawInput(LookAxisVector.X);
 		AddControllerPitchInput(-LookAxisVector.Y);
-	}
-}
-
-void APlayerCharacter::Drop()
-{
-	FVector SpawnLoc = Camera->GetComponentLocation() + (Camera->GetForwardVector() * 100.f);
-	FRotator SpawnRot = Camera->GetComponentRotation();
-	Server_DropItem(SpawnLoc, SpawnRot);
-}
-
-void APlayerCharacter::Server_DropItem_Implementation(FVector SpawnLocation, FRotator SpawnRotation)
-{
-	if (Inventory.IsValidIndex(ActiveSlotIndex) && Inventory[ActiveSlotIndex] != nullptr && !bIsHandEmpty)
-	{
-		AItemBase* ItemToDrop = Inventory[ActiveSlotIndex];
-
-		Multicast_PlayDropAnim();
-
-		FTimerHandle DropHandle;
-		FTimerDelegate DropDelegate;
-
-		DropDelegate.BindLambda([this, ItemToDrop, SpawnLocation, SpawnRotation]()
-		{
-			if (!ItemToDrop) return;
-
-			Multicast_FinishDropItem(ItemToDrop, SpawnLocation, SpawnRotation);
-
-			UStaticMeshComponent* ItemMesh = Cast<UStaticMeshComponent>(ItemToDrop->GetRootComponent());
-			if (ItemMesh)
-			{
-				ItemMesh->SetSimulatePhysics(true);
-				ItemMesh->AddImpulse(SpawnRotation.Vector() * 500.f, NAME_None, true);
-			}
-			ItemToDrop->ForceNetUpdate();
-
-			if (Inventory.IsValidIndex(ActiveSlotIndex))
-			{
-				Inventory[ActiveSlotIndex] = nullptr;
-				OnRep_Inventory();
-			}
-		});
-
-		GetWorld()->GetTimerManager().SetTimer(DropHandle, DropDelegate, 0.8f, false);
-	}
-}
-
-void APlayerCharacter::Multicast_PlayDropAnim_Implementation()
-{
-	PlayerAnimInstanceRef = Cast<UPlayerAnimInstance>(GetMesh()->GetAnimInstance());
-	if (ThrowMontage)
-	{
-		PlayerAnimInstanceRef->Montage_Play(ThrowMontage);
 	}
 }
 
@@ -234,6 +185,77 @@ void APlayerCharacter::Multicast_PlayPickupAnim_Implementation()
 	}
 }
 
+void APlayerCharacter::Drop()
+{
+	FVector SpawnLoc = Camera->GetComponentLocation() + (Camera->GetForwardVector() * 100.f);
+	FRotator SpawnRot = Camera->GetComponentRotation();
+	Server_DropItem(SpawnLoc, SpawnRot);
+}
+
+void APlayerCharacter::Server_DropItem_Implementation(FVector SpawnLocation, FRotator SpawnRotation)
+{
+	if (Inventory.IsValidIndex(ActiveSlotIndex) && Inventory[ActiveSlotIndex] != nullptr && !bIsHandEmpty)
+	{
+		AItemBase* ItemToDrop = Inventory[ActiveSlotIndex];
+
+		Multicast_PlayDropAnim();
+
+		FTimerHandle DropHandle;
+		FTimerDelegate DropDelegate;
+
+		DropDelegate.BindLambda([this, ItemToDrop, SpawnLocation, SpawnRotation]()
+		{
+			if (!ItemToDrop) return;
+
+			Multicast_FinishDropItem(ItemToDrop, SpawnLocation, SpawnRotation);
+
+			UStaticMeshComponent* ItemMesh = Cast<UStaticMeshComponent>(ItemToDrop->GetRootComponent());
+			if (ItemMesh)
+			{
+				ItemMesh->SetSimulatePhysics(true);
+				ItemMesh->AddImpulse(SpawnRotation.Vector() * 500.f, NAME_None, true);
+			}
+			ItemToDrop->ForceNetUpdate();
+
+			if (Inventory.IsValidIndex(ActiveSlotIndex))
+			{
+				Inventory[ActiveSlotIndex] = nullptr;
+				OnRep_Inventory();
+			}
+		});
+
+		GetWorld()->GetTimerManager().SetTimer(DropHandle, DropDelegate, 0.8f, false);
+	}
+}
+
+void APlayerCharacter::Multicast_PlayDropAnim_Implementation()
+{
+	PlayerAnimInstanceRef = Cast<UPlayerAnimInstance>(GetMesh()->GetAnimInstance());
+	if (ThrowMontage)
+	{
+		PlayerAnimInstanceRef->Montage_Play(ThrowMontage);
+	}
+}
+
+void APlayerCharacter::Multicast_FinishDropItem_Implementation(AItemBase* ItemToDrop, FVector Location, FRotator Rotation)
+{
+	if (!ItemToDrop) return;
+
+	ItemToDrop->DetachFromActor(FDetachmentTransformRules::KeepWorldTransform);
+	ItemToDrop->SetActorLocationAndRotation(Location, Rotation);
+
+	ItemToDrop->SetOwner(nullptr);
+	ItemToDrop->SetActorHiddenInGame(false);
+	ItemToDrop->SetActorEnableCollision(true);
+
+	UStaticMeshComponent* ItemMesh = Cast<UStaticMeshComponent>(ItemToDrop->GetRootComponent());
+	if (ItemMesh)
+	{
+		ItemMesh->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
+		ItemMesh->SetSimulatePhysics(false);
+	}
+}
+
 void APlayerCharacter::EquipSlot1()
 {
 	Server_SwitchSlot(0);
@@ -252,18 +274,16 @@ void APlayerCharacter::Server_SwitchSlot_Implementation(int32 NewSlotIndex)
 
 	ActiveSlotIndex = NewSlotIndex;
 
-	bIsHandEmpty = false;
+	if (Inventory[ActiveSlotIndex] != nullptr)
+	{
+		bIsHandEmpty = false;
+	}
+	else
+	{
+		bIsHandEmpty = true;
+	}
 
 	OnRep_ActiveSlotIndex();
-}
-
-void APlayerCharacter::OnRep_ActiveSlotIndex()
-{
-	UpdateHandVisuals();
-	if (HUDWidget)
-	{
-		HUDWidget->SetActiveSlotHighlight(ActiveSlotIndex);
-	}
 }
 
 void APlayerCharacter::UpdateHandVisuals()
@@ -285,20 +305,12 @@ void APlayerCharacter::UpdateHandVisuals()
 				}
 				else
 				{
-					UE_LOG(LogTemp, Error, TEXT("HATA Slot %d: %s iteminin IKONU (Texture) yok! BP'yi kontrol et."), i, *Item->GetName());
 					HUDWidget->UpdateSlotImage(i, nullptr);
 				}
 			}
 			else
 			{
 				HUDWidget->UpdateSlotImage(i, nullptr);
-			}
-		}
-		else
-		{
-			if (IsLocallyControlled())
-			{
-				UE_LOG(LogTemp, Error, TEXT("KRITIK HATA: HUDWidget NULL! BeginPlay icinde Widget olusmamis veya Class secilmemis."));
 			}
 		}
 		if (Item)
@@ -320,25 +332,6 @@ void APlayerCharacter::UpdateHandVisuals()
 				Item->SetActorHiddenInGame(true);
 			}
 		}
-	}
-}
-
-void APlayerCharacter::Multicast_FinishDropItem_Implementation(AItemBase* ItemToDrop, FVector Location, FRotator Rotation)
-{
-	if (!ItemToDrop) return;
-
-	ItemToDrop->DetachFromActor(FDetachmentTransformRules::KeepWorldTransform);
-	ItemToDrop->SetActorLocationAndRotation(Location, Rotation);
-
-	ItemToDrop->SetOwner(nullptr);
-	ItemToDrop->SetActorHiddenInGame(false);
-	ItemToDrop->SetActorEnableCollision(true);
-
-	UStaticMeshComponent* ItemMesh = Cast<UStaticMeshComponent>(ItemToDrop->GetRootComponent());
-	if (ItemMesh)
-	{
-		ItemMesh->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
-		ItemMesh->SetSimulatePhysics(false);
 	}
 }
 

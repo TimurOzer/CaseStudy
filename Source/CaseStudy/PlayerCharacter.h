@@ -15,8 +15,6 @@ class CASESTUDY_API APlayerCharacter : public ACharacter
 public:
 	// Sets default values for this character's properties
 	APlayerCharacter();
-	// Called every frame
-	virtual void Tick(float DeltaTime) override;
 
 	// Called to bind functionality to input
 	virtual void SetupPlayerInputComponent(class UInputComponent* PlayerInputComponent) override;
@@ -24,46 +22,53 @@ public:
 protected:
 	// Called when the game starts or when spawned
 	virtual void BeginPlay() override;
-
-	UFUNCTION(Server, Reliable)
-	void Server_PickupItem(class AItemBase* ItemToPickup);
-	UFUNCTION(NetMulticast, Unreliable)
-	void Multicast_PlayPickupAnim();
-	UFUNCTION(Server, Reliable)
-	void Server_DropItem(FVector SpawnLocation, FRotator SpawnRotation);
-	UFUNCTION(NetMulticast, Unreliable)
-	void Multicast_PlayDropAnim();
-
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 
-	UPROPERTY(ReplicatedUsing = OnRep_Inventory)
-	TArray<class AItemBase*> Inventory;
-
-	UPROPERTY(ReplicatedUsing = OnRep_ActiveSlotIndex)
-	int32 ActiveSlotIndex;
-
-	UFUNCTION()
-	void OnRep_ActiveSlotIndex();
-
-	void UpdateHandVisuals();
-
+	// PickUp Functions
 	UFUNCTION(Server, Reliable)
-	void Server_SwitchSlot(int32 NewSlotIndex);
+	void Server_PickupItem(class AItemBase* ItemToPickup);
 
-	UFUNCTION()
-	void OnRep_Inventory();
+	UFUNCTION(NetMulticast, Unreliable)
+	void Multicast_PlayPickupAnim();
+
+	// Drop Functions
+	UFUNCTION(Server, Reliable)
+	void Server_DropItem(FVector SpawnLocation, FRotator SpawnRotation);
+
+	UFUNCTION(NetMulticast, Unreliable)
+	void Multicast_PlayDropAnim();
 
 	UFUNCTION(NetMulticast, Reliable)
 	void Multicast_FinishDropItem(AItemBase* ItemToDrop, FVector Location, FRotator Rotation);
 
-	UPROPERTY(ReplicatedUsing = OnRep_IsHandEmpty)
-	bool bIsHandEmpty;
+	// Slot Switching Functions
+	UFUNCTION(Server, Reliable)
+	void Server_SwitchSlot(int32 NewSlotIndex);
+
+	// Empty Hand Functions
+	UFUNCTION(Server, Reliable)
+	void Server_ToggleEmptyHand();
+
+	// Replicated Properties Functions
+	UFUNCTION()
+	void OnRep_Inventory();
 
 	UFUNCTION()
 	void OnRep_IsHandEmpty();
 
-	UFUNCTION(Server, Reliable)
-	void Server_ToggleEmptyHand();
+	UFUNCTION()
+	void OnRep_ActiveSlotIndex();
+
+	// Replicated Properties
+	UPROPERTY(ReplicatedUsing = OnRep_Inventory)
+	TArray<class AItemBase*> Inventory;
+
+	UPROPERTY(ReplicatedUsing = OnRep_IsHandEmpty)
+	bool bIsHandEmpty;
+
+	UPROPERTY(ReplicatedUsing = OnRep_ActiveSlotIndex)
+	int32 ActiveSlotIndex;
+
 private:
 
 	UPROPERTY()
@@ -116,4 +121,5 @@ private:
 	void Pickup();
 	void EquipSlot1();
 	void EquipSlot2();
+	void UpdateHandVisuals();
 };
