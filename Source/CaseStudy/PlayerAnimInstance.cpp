@@ -2,14 +2,14 @@
 
 
 #include "PlayerAnimInstance.h"
-#include "PlayerCharacter.h"
+#include "BaseCharacter.h"
 #include "KismetAnimationLibrary.h"
 
 void UPlayerAnimInstance::NativeUpdateAnimation(float DeltaSeconds)
 {
 	if (TryGetPawnOwner())
 	{
-		APlayerCharacter* PlayerCharacterRef = Cast<APlayerCharacter>(TryGetPawnOwner());
+		ABaseCharacter* PlayerCharacterRef = Cast<ABaseCharacter>(TryGetPawnOwner());
 		DirectionCPP = UKismetAnimationLibrary::CalculateDirection(TryGetPawnOwner()->GetVelocity(), TryGetPawnOwner()->GetActorRotation());
 		SpeedCPP = TryGetPawnOwner()->GetVelocity().Size();
 	}
