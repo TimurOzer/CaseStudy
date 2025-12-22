@@ -19,7 +19,10 @@ public:
 	ABaseCharacter();
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "AbilitySystem")
-	class UAbilitySystemComponent* AbilitySystemComponent;
+	UAbilitySystemComponent* AbilitySystemComponent;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "AbilitySystem")
+	class UBasicAttributeSet* BasicAttributeSet;
 
 protected:
 	// Called when the game starts or when spawned
