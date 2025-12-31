@@ -6,10 +6,10 @@
 
 UBasicAttributeSet::UBasicAttributeSet()
 {
-	InitHealth(100.f);
-	InitMaxHealth(100.f);
-	InitStamina(100.f);
-	InitMaxStamina(100.f);
+	Health = 100.f;
+	MaxHealth = 100.f;
+	Stamina = 100.f;
+	MaxStamina = 100.f;
 }
 
 void UBasicAttributeSet::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
@@ -19,24 +19,4 @@ void UBasicAttributeSet::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& O
 	DOREPLIFETIME_CONDITION_NOTIFY(UBasicAttributeSet, MaxHealth, COND_None, REPNOTIFY_Always);
 	DOREPLIFETIME_CONDITION_NOTIFY(UBasicAttributeSet, Stamina, COND_None, REPNOTIFY_Always);
 	DOREPLIFETIME_CONDITION_NOTIFY(UBasicAttributeSet, MaxStamina, COND_None, REPNOTIFY_Always);
-}
-
-void UBasicAttributeSet::OnRep_Health(const FGameplayAttributeData& OldValue) const
-{
-	GAMEPLAYATTRIBUTE_REPNOTIFY(UBasicAttributeSet, Health, OldValue);
-}
-
-void UBasicAttributeSet::OnRep_MaxHealth(const FGameplayAttributeData& OldValue) const
-{
-	GAMEPLAYATTRIBUTE_REPNOTIFY(UBasicAttributeSet, MaxHealth, OldValue);
-}
-
-void UBasicAttributeSet::OnRep_Stamina(const FGameplayAttributeData& OldValue) const
-{
-	GAMEPLAYATTRIBUTE_REPNOTIFY(UBasicAttributeSet, Stamina, OldValue);
-}
-
-void UBasicAttributeSet::OnRep_MaxStamina(const FGameplayAttributeData& OldValue) const
-{
-	GAMEPLAYATTRIBUTE_REPNOTIFY(UBasicAttributeSet, MaxStamina, OldValue);
 }

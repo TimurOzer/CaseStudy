@@ -7,7 +7,6 @@
 #include "EnhancedInputComponent.h"
 #include "EnhancedInputSubsystems.h"
 #include "InputMappingContext.h"
-#include "BasicAttributeSet.h"
 
 // Sets default values
 ABaseCharacter::ABaseCharacter()
@@ -32,8 +31,6 @@ ABaseCharacter::ABaseCharacter()
 	GetCharacterMovement()->MaxWalkSpeed = 300.f;
 	GetCharacterMovement()->BrakingDecelerationWalking = 2048.f;
 	GetCharacterMovement()->BrakingDecelerationFalling = 0.f;
-
-	BasicAttributeSet = CreateDefaultSubobject<UBasicAttributeSet>(TEXT("BasicAttributeSet"));
 }
 
 // Called when the game starts or when spawned
